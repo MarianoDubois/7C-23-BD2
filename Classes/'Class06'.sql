@@ -11,7 +11,9 @@ order by last_name;
 
 select first_name
 from actor as ac
-where not exists(select actor_id from film_actor as fa where fa.actor_id = ac.actor_id);
+where not exists(select actor_id
+                from film_actor as fa 
+                where fa.actor_id = ac.actor_id);
 
 /*Query 3 Find customers that rented only one film*/
 

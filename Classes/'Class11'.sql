@@ -1,64 +1,39 @@
--- Active: 1679485957399@@127.0.0.1@3306@sakila
-SELECT c.country , count(ct.city) as City_cant FROM country c join city ct on c.country_id = ct.country_id GROUP BY c.country HAVING City_cant > 10 ORDER BY City_cant desc;
+-- Active: 1682515061137@@127.0.0.1@3306@sakila
+#Find all the film titles that are not in the inventory.
+SELECT title FROM film
+WHERE film_id NOT IN (SELECT DISTINCT inventory.film_id FROM inventory);
 
-SELECT  c.first_name, 
-        c.last_name,
-        (SELECT COUNT(*) FROM rental r WHERE c.customer_id = r.customer_id) AS 'Cant_pelis_que_alquilo',
-        (SELECT GROUP_CONCAT(DISTINCT title ORDER BY title SEPARATOR ', ')
-            FROM film
-            WHERE film_id IN(SELECT film_id
-                                FROM inventory
-                                WHERE store_id IN(SELECT store_id
-                                                    FROM store
-                                                    WHERE store_id IN(SELECT store_id
-                                                                        FROM customer 
-                                                                        WHERE customer_id IN(SELECT customer_id
-                                                                                                FROM rental r
-                                                                                                WHERE c.customer_id = r.customer_id))))) AS 'Pelis_que_alguna_vez_alquilo'
-                                                                                                from customer c;
---def bad
-select c.first_name 
-from customer c inner join rental r on c.customer_id = r.customer_id 
-where c.customer_id = r.customer_id and return_date <= CURDATE();
+#Find all the films that are in the inventory but were never rented.
+SELECT f.title, i.inventory_id FROM film f
+JOIN inventory i using(film_id)
+LEFT JOIN rental r using(inventory_id)
+WHERE r.rental_id IS NULL;
 
---maybe good?
-SELECT c.last_name
-from customer c inner join rental r on c.customer_id = r.customer_id
-where r.return_date = null;
+#Generate a report 
+SELECT 
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    r.store_id,
+    f.title ,
+    r.rental_date,
+    r.return_date
+FROM customer AS c
+JOIN rental AS r USING (customer_id)
+JOIN inventory AS i USING (inventory_id)
+JOIN film AS f USING (film_id)
+ORDER BY r.store_id, c.last_name;
 
---gudge
-select *
-from rental r inner join payment p on p.rental_id = r.rental_id 
-where p.amount BETWEEN 2 and 7;
+#Show sales per store (money of rented films)
+SELECT s.store_id, SUM(p.amount) AS `Ventas totales`
+FROM store AS s
+INNER JOIN inventory AS i USING (store_id)
+INNER JOIN rental AS r USING (inventory_id)
+INNER JOIN payment AS p USING (rental_id)
+GROUP BY s.store_id;
 
-SELECT c.last_name,
-(SELECT MAX(p.amount) from payment p where c.customer_id = p.customer_id),
-(SELECT MIN(p.amount) from payment p where c.customer_id = p.customer_id),
-(SELECT GROUP_CONCAT(p.amount SEPARATOR ', ') FROM payment p WHERE c.customer_id = p.customer_id) from customer c;
-
-SELECT title, max(replacement_cost), min(replacement_cost) from film group by title;
-
-SELECT c.first_name,c.last_name 
-from customer c 
-where exists (SELECT c2.first_name from customer c2 where c.first_name = c2.first_name and c.customer_id != c2.customer_id) 
-order by c.first_name;
-
-SELECT a.last_name
-from actor a 
-where exists (SELECT * from film f join film_actor fa on f.film_id = fa.film_id where a.actor_id = fa.actor_id and fa.film_id = f.film_id and (f.title = 'BETRAYED REAR' and 'CATCH AMISTAD'))
-and not exists (SELECT * from film f join film_actor fa on f.film_id = fa.film_id where a.actor_id = fa.actor_id and fa.film_id = f.film_id and f.title = 'ACE GOLDFINGER') ;
-
-select f.title, COUNT(fa.actor_id)
-from film f inner join film_actor fa on f.film_id=fa.film_id
-GROUP BY f.title
-having COUNT(fa.actor_id) > 4;
-
-SELECT (SELECT first_name
-        FROM actor a2
-        WHERE a1.first_name LIKE 'A%' 
-        AND first_name = ANY(SELECT first_name
-                    FROM actor a2
-                    WHERE a1.first_name = a2.first_name
-                        AND a1.actor_id <> a2.actor_id)), last_name
-    FROM actor a1
-    ORDER BY a1.first_name;
+#Which actor has appeared in the most films?
+SELECT a.actor_id, CONCAT(a.first_name, ' ', a.last_name) AS nombre, COUNT(fa.film_id) AS cantidad
+FROM actor a
+JOIN film_actor fa using(actor_id)
+GROUP BY a.actor_id, a.first_name, a.last_name
+ORDER BY cantidad DESC
+LIMIT 1;
